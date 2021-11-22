@@ -7,5 +7,6 @@ const routes = new Router();
 routes.post('/cpf', buscarCliente.cpf);
 routes.post('/cnpj', buscarCliente.cnpj);
 routes.post('/faturas', buscarCliente.faturas);
+routes.post('/desbloqueio', buscarCliente.desbloqueio);
 
 module.exports = routes;

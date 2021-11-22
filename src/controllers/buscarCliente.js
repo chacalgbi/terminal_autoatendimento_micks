@@ -6,6 +6,7 @@ const INTE  = require('../configs/integrator');
 const vCPF  = require('../configs/valida_cpf');
 const vCNPJ = require('../configs/valida_cnpj');
 const ApiIntegrator = require('../configs/api_integrator');
+const ApiIntegrator_desbloqueio = require('../configs/api_integrator_desbloqueio');
 const linkBoleto = require('../configs/integrator_verBoleto');
 const abrirHtml = require('../configs/abrir_html');
 const baixarPdf = require('../configs/baixar_pdf');
@@ -17,6 +18,7 @@ const path = './files/boleto.pdf';
 let tudo_ok = true;
 let proximo_for = false;
 let trava = 0;
+let limite_dias = 90;
 
 class buscarCliente{
 
@@ -26,7 +28,26 @@ class buscarCliente{
       let retorno = { cpf: req.body.cpf }
       if(req.body.cpf.length === 14){
         if(vCPF(req.body.cpf)){
-          const sql = `SELECT  c.codcli, c.nome_cli, c.endereco, c.bairro FROM servicos_cli sc JOIN clientes c on c.codcli=sc.codcli  JOIN servicos s on s.codser = sc.codser JOIN dados_pop un on sc.codpop=un.codpop WHERE TRUE AND c.ativo = 'S' AND sc.codest != '020IN0W6LU' AND s.autentica_radius = 'S' AND c.cpf = '${req.body.cpf}' GROUP by sc.codsercli`;
+          //const sql = `SELECT  c.codcli, c.nome_cli, c.endereco, c.bairro, sc.codsercli FROM servicos_cli sc JOIN clientes c on c.codcli=sc.codcli  JOIN servicos s on s.codser = sc.codser JOIN dados_pop un on sc.codpop=un.codpop WHERE TRUE AND c.ativo = 'S' AND sc.codest != '020IN0W6LU' AND s.autentica_radius = 'S' AND c.cpf = '${req.body.cpf}' GROUP by sc.codsercli`;
+          const sql = `SELECT  
+                        cr.codcli as codigo, 
+                        c.nome_cli, 
+                        c.endereco,  
+                        c.bairro,  
+                        sc.codsercli, 
+                          DATEDIFF(CURDATE(), MIN(cr.data_ven)) as dias_venc 
+                        FROM contas_rec cr 
+                        LEFT JOIN servicos_cli sc on sc.codsercli=cr.codsercli 
+                        LEFT JOIN servicos s on s.codser = sc.codser 
+                        LEFT JOIN clientes c on c.codcli = cr.codcli 
+                        WHERE TRUE  
+                        AND c.cpf = '${req.body.cpf}' 
+                        AND c.ativo = 'S' 
+                        AND s.autentica_radius = 'S'  
+                        and data_bai is null 
+                        and valor_lan > 0 
+                        AND cr.valor_lan-cr.valor_pag>0 
+                        GROUP by sc.codsercli`;
           await INTE(sql).then((resp)=>{
             if(resp.resposta.length === 0){
               retorno.msg = "CPF Válido. Mas você não é cliente MICKS! :(";
@@ -92,15 +113,34 @@ class buscarCliente{
 
   }
 
+  async desbloqueio(req, res){
+    tudo_ok = true;
+    const codsercli = req.body.codsercli;
+    let retorno = { codsercli: codsercli };
+    await ApiIntegrator_desbloqueio(codsercli).then((resp)=>{
+      log(resp.exception);
+      retorno.dados = resp;
+      API(retorno, res, 200, tudo_ok);
+    }).catch((erro)=>{
+      retorno.dados = erro;
+      tudo_ok = false;
+      retorno.msg = "Erro ao buscar no Banco de Dados do Integrator";
+      retorno.prospecto = "nao";
+      API(retorno, res, 200, tudo_ok);
+    });
+  }
+
   async faturas(req, res){
     const formatado = req.body.codcli.replace(/\D+/g, "");
-    let retorno = { codcli: formatado }
     log(`Faturas do cliente: ${formatado}`, "info");
+
+    tudo_ok = true;
+    proximo_for = false;
+    trava = 0;
+    let retorno = { codcli: formatado };
+    let modificado = [];
     let resposta;
-    const sql = `SELECT fat.codfat, sp.porcentagem, DATE_FORMAT(fat.data_ven, '%d/%m/%Y') as vencimento, c.nome_cli, c.endereco, c.bairro, cr.histo_rec, fat.status, fat.data_ven FROM contas_rec cr  
-                 JOIN servicos_cli sc on sc.codsercli=cr.codsercli JOIN detalhe_faturas df ON df.codcrec = cr.codcrec JOIN faturas fat on fat.codfat= df.codfat 
-                 JOIN clientes c on c.codcli = cr.codcli LEFT JOIN servicos_pant sp on sp.codser = sc.codser 
-                 WHERE TRUE AND cr.codcli = '${formatado}' AND cr.data_bai is null AND cr.valor_lan-cr.valor_pag>0 AND fat.status != 'D' GROUP by fat.codfat ORDER BY data_ven;`;
+    const sql = `SELECT fat.codfat, sp.porcentagem, DATE_FORMAT(fat.data_ven, '%d/%m/%Y') as vencimento, c.nome_cli, c.endereco, c.bairro, cr.histo_rec, fat.status, fat.data_ven FROM contas_rec cr JOIN servicos_cli sc on sc.codsercli=cr.codsercli JOIN detalhe_faturas df ON df.codcrec = cr.codcrec JOIN faturas fat on fat.codfat= df.codfat JOIN clientes c on c.codcli = cr.codcli LEFT JOIN servicos_pant sp on sp.codser = sc.codser WHERE TRUE AND cr.codcli = '${formatado}' AND cr.data_bai is null AND cr.valor_lan-cr.valor_pag>0 AND fat.status != 'D' AND c.ativo='S' GROUP by fat.codfat ORDER BY data_ven;`;
     
     await INTE(sql).then((resp)=>{
       resposta = resp;
@@ -108,29 +148,30 @@ class buscarCliente{
         tudo_ok = false;
         retorno.msg = "Não foram encontradas faturas para este cliente";
         retorno.prospecto = "nao";
-        log("Cliente nao encontrado", "erro");
         API(retorno, res, 200, tudo_ok);
       }else{
-        log(`SELECT de: ${resp.resposta[0].nome_cli} - ${resp.resposta.length} faturas`);
+        log(`${resp.resposta[0].nome_cli} - ${resp.resposta.length} faturas`);
         retorno.msg = "Confira suas faturas";
         retorno.prospecto = "sim";
       }
-    })
-    .catch((erro)=>{
+    }).catch((erro)=>{
       retorno.dados = erro;
       tudo_ok = false;
       retorno.msg = "Erro ao buscar no Banco de Dados do Integrator";
+      retorno.prospecto = "nao";
       API(retorno, res, 200, tudo_ok);
     });
 
     if(retorno.prospecto === "sim"){
-      let modificado = [];
-      //Comparar os dados do SELECT com os dados da API do Integrator
-      for (const [index, fatura] of resposta.resposta.entries()) {
-        //console.log("BD:  ", fatura.codfat);
+      for (const [index, fatura] of resposta.resposta.entries()) { //Comparar dados do SELECT com dados do Integrator
         await ApiIntegrator(formatado, fatura.vencimento, fatura.vencimento).then((resp)=>{
             resp.data.results.map((item, index)=>{
-              if(fatura.codfat == item.codfat){
+              if(parseInt(item.dias) > limite_dias){
+                retorno.msg = "Por favor, procure a Micks";
+                retorno.prospecto = "sim";
+                tudo_ok = false;
+                log(`Vencimento:${fatura.vencimento} - Valor:${item.valor_com_juros} - Dias de Atraso:${item.dias}`, "erro");
+              }else if(fatura.codfat == item.codfat){
                 proximo_for = true;
                 let obj = {
                   cod_fatura: fatura.codfat,
@@ -144,12 +185,12 @@ class buscarCliente{
                   valor_a_pagar: parseFloat(item.valor_com_juros)
                 }
                 parseInt(item.dias) <= 0 ? obj.dias_vencidos = 0 : obj.dias_vencidos = parseInt(item.dias);
-                
                 modificado.push(obj);
               }else{
-                console.log("Codfat não é igual");
+                log(`Codfat não é igual: API:${item.codfat} - BD:${fatura.codfat}`, "erro");
               }
             });
+            
          })
         .catch((erro)=>{
           console.log(erro);
@@ -160,12 +201,12 @@ class buscarCliente{
       }
       retorno.num_faturas = modificado.length;
       retorno.boletos = modificado;
-      modificado = [];
 
       if(proximo_for){
           // Pegar aqui o valor do desconto que está no boleto
           for (const [index, boleto] of retorno.boletos.entries()) {
             trava = 0;
+            tudo_ok = true;
 
             if(trava === 0){
               await apagar().then((resp_apagar)=>{
@@ -193,7 +234,7 @@ class buscarCliente{
             }
 
             if(trava === 2){
-              await delay(500);
+              await delay(600);
               trava = 3;
             }
 
@@ -210,7 +251,7 @@ class buscarCliente{
             }
 
             if(trava === 4){
-              await baixarPdf(retorno.boletos[index].linkPDF, path, function(){  }).then((res_baixou)=>{
+              await baixarPdf(retorno.boletos[index].linkPDF, path, retorno.boletos[index].dias_vencidos, function(){  }).then((res_baixou)=>{
                 retorno.boletos[index].status_boleto = res_baixou;
                 trava = 0;
               }).catch((err_baixou)=>{

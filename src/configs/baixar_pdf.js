@@ -40,7 +40,7 @@ function textoAleatorio(tamanho){
     return aleatorio;
 }
 
-module.exports = function download(uri, filename, callback){
+module.exports = function download(uri, filename, dias, callback){
     return new Promise((resolve, reject) =>{
         if (fs.existsSync(path)) {
             fs.rename(path, `./files/${textoAleatorio(15)}.pdf`, function (err) {
@@ -70,15 +70,15 @@ module.exports = function download(uri, filename, callback){
                         const valor = pegar("Valor do Documento\\n", texto).replace(",", ".");
                         const desconto = desc("DESCONTO DE R$", " PARA PAGAMENTO ATÉ", texto);
                         //console.log(texto);
-                        log(`Vencimento: ${vencimento} - Valor: ${valor} - Desconto: ${desconto}`, 'alerta');
+                        log(`Vencimento: ${vencimento} - Valor: ${valor} - Desconto: ${desconto} - Dias vencidos: ${dias}`, 'alerta');
                         pdf_lido.vencimento = vencimento;
                         pdf_lido.valor = parseFloat(valor);
                         pdf_lido.desconto = parseFloat(desconto);
                         resolve(pdf_lido);
                     }).catch((erro)=>{
-                        reject(erro);
+                        reject(erro.details);
                     });
-                }, 1000);
+                }, 1500);
             }else{
                 reject({PDF: "ERROR", tamanho: kilobytes + " kb"})
             }
