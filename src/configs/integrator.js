@@ -6,7 +6,7 @@ module.exports = function acessar_BD(query){
             if (erro){
                 const retorno = {
                     errorBD:"sim",
-                    resposta:erro.sqlMessage
+                    resposta:erro
                 }
                 reject(retorno);
             }

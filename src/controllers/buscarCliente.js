@@ -5,6 +5,7 @@ const BD    = require('../configs/acessar_BD');
 const INTE  = require('../configs/integrator');
 const vCPF  = require('../configs/valida_cpf');
 const vCNPJ = require('../configs/valida_cnpj');
+const Barra = require('../configs/barra');
 const ApiIntegrator = require('../configs/api_integrator');
 const ApiIntegrator_desbloqueio = require('../configs/api_integrator_desbloqueio');
 const linkBoleto = require('../configs/integrator_verBoleto');
@@ -14,67 +15,81 @@ const lerPdf = require('../configs/ler_pdf');
 const apagar = require('../configs/apagar_boleto');
 const delay = require('../configs/delay');
 const path = './files/boleto.pdf';
+const { exec } = require('child_process');
 
 let tudo_ok = true;
 let proximo_for = false;
 let trava = 0;
 let limite_dias = 90;
 
+function pegar(start, texto){
+  let tamanho = start.length;
+  let inicio = texto.indexOf(start);
+  if(inicio == -1) return "nao_encontrado"
+  inicio = inicio + tamanho;
+  let fim = texto.indexOf("\\n", inicio);
+  return texto.substring(inicio, fim).trim();
+}
+
 class buscarCliente{
 
   async cpf(req, res){
+    let retorno = { cpf: '' }
+    let isSucess = false;
 
-    if(req.body.cpf){ // Se existir o campo CPF
-      let retorno = { cpf: req.body.cpf }
-      if(req.body.cpf.length === 14){
-        if(vCPF(req.body.cpf)){
-          //const sql = `SELECT  c.codcli, c.nome_cli, c.endereco, c.bairro, sc.codsercli FROM servicos_cli sc JOIN clientes c on c.codcli=sc.codcli  JOIN servicos s on s.codser = sc.codser JOIN dados_pop un on sc.codpop=un.codpop WHERE TRUE AND c.ativo = 'S' AND sc.codest != '020IN0W6LU' AND s.autentica_radius = 'S' AND c.cpf = '${req.body.cpf}' GROUP by sc.codsercli`;
-          const sql = `SELECT  
-                        cr.codcli as codigo, 
-                        c.nome_cli, 
-                        c.endereco,  
-                        c.bairro,  
-                        sc.codsercli, 
-                          DATEDIFF(CURDATE(), MIN(cr.data_ven)) as dias_venc 
-                        FROM contas_rec cr 
-                        LEFT JOIN servicos_cli sc on sc.codsercli=cr.codsercli 
-                        LEFT JOIN servicos s on s.codser = sc.codser 
-                        LEFT JOIN clientes c on c.codcli = cr.codcli 
-                        WHERE TRUE  
-                        AND c.cpf = '${req.body.cpf}' 
-                        AND c.ativo = 'S' 
-                        AND s.autentica_radius = 'S'  
-                        and data_bai is null 
-                        and valor_lan > 0 
-                        AND cr.valor_lan-cr.valor_pag>0 
-                        GROUP by sc.codsercli`;
-          await INTE(sql).then((resp)=>{
-            if(resp.resposta.length === 0){
-              retorno.msg = "CPF Válido. Mas você não é cliente MICKS! :(";
-              retorno.prospecto = "nao";
-            }else{
-              retorno.msg = "CPF Válido. Confira seu plano";
-              retorno.prospecto = "sim";
-            }
-            retorno.dados = resp;
-            API(retorno, res, 200, true);
-          }).catch((erro)=>{
-            retorno.dados = erro;
-            API(retorno, res, 200, false);
-          });
-        }else{
-          retorno.msg = "CPF Inválido! Por favor, digite um CPF válido!";
-          retorno.prospecto = "";
-          API(retorno, res, 200, false);
-        }      
-      }else{
-        retorno.msg = "CPF Incompleto! Por favor digite todos os números!";
-        API(retorno, res, 200, false);
-      }
-    }else{
-      API({msg: "Erro de Sintaxe, o Campo CPF não foi informado"}, res, 200, false);
-    }
+	if(req.body.cpf){ // Se existir o campo CPF
+		retorno.cpf = req.body.cpf;
+		if(req.body.cpf.length === 14){
+			if(vCPF(req.body.cpf)){
+				//const sql1 = `SELECT op.codocop, op.nome_ocop FROM oco_padrao op WHERE op.ativo = 'S'`;
+				const sql = `SELECT  
+							cr.codcli as codigo, 
+							c.nome_cli, 
+							c.endereco,  
+							c.bairro,  
+							sc.codsercli, 
+								DATEDIFF(CURDATE(), MIN(cr.data_ven)) as dias_venc 
+							FROM contas_rec cr 
+							LEFT JOIN servicos_cli sc on sc.codsercli=cr.codsercli 
+							LEFT JOIN servicos s on s.codser = sc.codser 
+							LEFT JOIN clientes c on c.codcli = cr.codcli 
+							WHERE TRUE  
+							AND c.cpf = '${req.body.cpf}' 
+							AND c.ativo = 'S' 
+							AND s.autentica_radius = 'S'  
+							and data_bai is null 
+							and valor_lan > 0 
+							AND cr.valor_lan-cr.valor_pag>0 
+							GROUP by sc.codsercli`;
+				await INTE(sql).then((resp)=>{
+					if(resp.resposta.length === 0){
+						retorno.msg = "CPF Válido. Mas você não é cliente MICKS! :(";
+						retorno.prospecto = "nao";
+					}else{
+						retorno.msg = "CPF Válido. Confira seu plano";
+						retorno.prospecto = "sim";
+					}
+					isSucess = true;
+					retorno.dados = resp;
+				}).catch((erro)=>{
+					console.log(erro)
+					retorno.dados = erro;
+					isSucess = false;
+				});
+			}else{
+				retorno.msg = "CPF Inválido! Por favor, digite um CPF válido!";
+				isSucess = false;
+			}      
+		}else{
+			retorno.msg = "CPF Incompleto! Por favor digite todos os números!";
+			isSucess = false;
+		}
+	}else{
+		isSucess = false;
+		retorno.msg = "Erro de Sintaxe, o Campo CPF não foi informado"
+	}
 
+	API(retorno, res, 200, isSucess);
   }
 
   async cnpj(req, res){
@@ -143,99 +158,113 @@ class buscarCliente{
     const sql = `SELECT fat.codfat, sp.porcentagem, DATE_FORMAT(fat.data_ven, '%d/%m/%Y') as vencimento, c.nome_cli, c.endereco, c.bairro, cr.histo_rec, fat.status, fat.data_ven FROM contas_rec cr JOIN servicos_cli sc on sc.codsercli=cr.codsercli JOIN detalhe_faturas df ON df.codcrec = cr.codcrec JOIN faturas fat on fat.codfat= df.codfat JOIN clientes c on c.codcli = cr.codcli LEFT JOIN servicos_pant sp on sp.codser = sc.codser WHERE TRUE AND cr.codcli = '${formatado}' AND cr.data_bai is null AND cr.valor_lan-cr.valor_pag>0 AND fat.status != 'D' AND c.ativo='S' GROUP by fat.codfat ORDER BY data_ven;`;
     
     await INTE(sql).then((resp)=>{
-      resposta = resp;
-      if(resp.resposta.length === 0){
+        resposta = resp;
+        if(resp.resposta.length === 0){
+          tudo_ok = false;
+          retorno.msg = "Não foram encontradas faturas para este cliente";
+          retorno.prospecto = "nao";
+          API(retorno, res, 200, tudo_ok);
+        }else{
+          log(`${resp.resposta[0].nome_cli} - ${resp.resposta.length} faturas`);
+          retorno.msg = "Confira suas faturas";
+          retorno.prospecto = "sim";
+        }
+    }).catch((erro)=>{
+        retorno.dados = erro;
         tudo_ok = false;
-        retorno.msg = "Não foram encontradas faturas para este cliente";
+        retorno.msg = "Erro ao buscar no Banco de Dados do Integrator";
         retorno.prospecto = "nao";
         API(retorno, res, 200, tudo_ok);
-      }else{
-        log(`${resp.resposta[0].nome_cli} - ${resp.resposta.length} faturas`);
-        retorno.msg = "Confira suas faturas";
-        retorno.prospecto = "sim";
-      }
-    }).catch((erro)=>{
-      retorno.dados = erro;
-      tudo_ok = false;
-      retorno.msg = "Erro ao buscar no Banco de Dados do Integrator";
-      retorno.prospecto = "nao";
-      API(retorno, res, 200, tudo_ok);
     });
 
     if(retorno.prospecto === "sim"){
-      for (const [index, fatura] of resposta.resposta.entries()) { //Comparar dados do SELECT com dados do Integrator
-        await ApiIntegrator(formatado, fatura.vencimento, fatura.vencimento).then((resp)=>{
-            resp.data.results.map((item, index)=>{
-              if(parseInt(item.dias) > limite_dias){
-                retorno.msg = "Por favor, procure a Micks";
-                retorno.prospecto = "sim";
+
+        //Comparar dados do SELECT com dados do Integrator
+        for (const [index, fatura] of resposta.resposta.entries()) {
+            await ApiIntegrator(formatado, fatura.vencimento, fatura.vencimento).then((resp)=>{
+                resp.data.results.map((item, index)=>{
+                  if(parseInt(item.dias) > limite_dias){
+                    retorno.msg = "Por favor, procure a Micks";
+                    retorno.prospecto = "sim";
+                    tudo_ok = false;
+                    log(`Vencimento:${fatura.vencimento} - Valor:${item.valor_com_juros} - Dias de Atraso:${item.dias}`, "erro");
+                  }else if(fatura.codfat == item.codfat){
+                    proximo_for = true;
+                    let obj = {
+                      cod_fatura: fatura.codfat,
+                      vencimento: fatura.vencimento,
+                      cliente: fatura.nome_cli,
+                      endereco: `${fatura.endereco} - ${fatura.bairro}`,
+                      decricao1: fatura.histo_rec,
+                      descricao2: item.descri_cob,
+                      percentual_desc: fatura.porcentagem,
+                      valor_normal: parseFloat(item.valor),
+                      valor_a_pagar: parseFloat(item.valor_com_juros)
+                    }
+                    parseInt(item.dias) <= 0 ? obj.dias_vencidos = 0 : obj.dias_vencidos = parseInt(item.dias);
+                    modificado.push(obj);
+                  }else{
+                    log(`Codfat não é igual: API:${item.codfat} - BD:${fatura.codfat}`, "erro");
+                  }
+                });
+                
+            })
+            .catch((erro)=>{
+                console.log(erro);
                 tudo_ok = false;
-                log(`Vencimento:${fatura.vencimento} - Valor:${item.valor_com_juros} - Dias de Atraso:${item.dias}`, "erro");
-              }else if(fatura.codfat == item.codfat){
-                proximo_for = true;
-                let obj = {
-                  cod_fatura: fatura.codfat,
-                  vencimento: fatura.vencimento,
-                  cliente: fatura.nome_cli,
-                  endereco: `${fatura.endereco} - ${fatura.bairro}`,
-                  decricao1: fatura.histo_rec,
-                  descricao2: item.descri_cob,
-                  percentual_desc: fatura.porcentagem,
-                  valor_normal: parseFloat(item.valor),
-                  valor_a_pagar: parseFloat(item.valor_com_juros)
-                }
-                parseInt(item.dias) <= 0 ? obj.dias_vencidos = 0 : obj.dias_vencidos = parseInt(item.dias);
-                modificado.push(obj);
-              }else{
-                log(`Codfat não é igual: API:${item.codfat} - BD:${fatura.codfat}`, "erro");
-              }
+                retorno.msg = "Erro ao buscar na API do Integrator o codcli";
+                retorno.erro = erro;
             });
-            
-         })
-        .catch((erro)=>{
-          console.log(erro);
-          tudo_ok = false;
-          retorno.msg = "Erro ao buscar na API do Integrator o codcli";
-          retorno.erro = erro;
-        });
-      }
-      retorno.num_faturas = modificado.length;
-      retorno.boletos = modificado;
+        }
+
+        // PEGAR O CÓDIGO DE BARRAS DOS BOLETOS
+        for (const [index, item] of modificado.entries()) {
+            await Barra(item.cod_fatura).then((resp)=>{
+                item.codBarra = resp
+            })
+            .catch((erro)=>{
+                item.codBarra = ""
+                console.log(erro)
+            });
+        }
+
+        retorno.num_faturas = modificado.length;
+        retorno.boletos = modificado;
 
       if(proximo_for){
           // Pegar aqui o valor do desconto que está no boleto
           for (const [index, boleto] of retorno.boletos.entries()) {
-            trava = 0;
-            tudo_ok = true;
+              trava = 0;
+              tudo_ok = true;
 
             if(trava === 0){
               await apagar().then((resp_apagar)=>{
-                //console.log(resp_apagar);
-                trava = 1;
+                  //console.log(resp_apagar);
+                  trava = 1;
               }).catch((err_apagar)=>{
-                console.log("Erro Apagar", err_apagar);
-                tudo_ok = false;
-                retorno.msg = "Erro ao apagar o PDF";
-                retorno.erro = err_apagar;
+                  console.log("Erro Apagar", err_apagar);
+                  tudo_ok = false;
+                  retorno.msg = "Erro ao apagar o PDF";
+                  retorno.erro = err_apagar;
               });
             }
 
             if(trava === 1){
               await linkBoleto(boleto.cod_fatura).then((resp_link)=>{
-                retorno.boletos[index].linkHtml = "http://177.38.178.24/" + resp_link.data.results[0].linkBoleto;
-                trava = 2
+                  retorno.boletos[index].linkHtml = "http://177.38.178.24/" + resp_link.data.results[0].linkBoleto;
+                  trava = 2
               }).catch((err_link)=>{
-                console.log("Erro Link", err_link);
-                tudo_ok = false;
-                retorno.msg = "Erro ao pegar o link do Boleto";
-                retorno.erro = err_link;
+                  console.log("Erro Link", err_link);
+                  tudo_ok = false;
+                  retorno.msg = "Erro ao pegar o link do Boleto";
+                  retorno.erro = err_link;
               });
   
             }
 
             if(trava === 2){
-              await delay(600);
-              trava = 3;
+                await delay(300);
+                trava = 3;
             }
 
             if(trava === 3){
@@ -267,6 +296,166 @@ class buscarCliente{
 
       API(retorno, res, 200, tudo_ok);
     }
+  }
+
+  async faturas_app(req, res){
+    const formatado = req.body.codcli.replace(/\D+/g, "");
+    log(`APP - Faturas do cliente: ${formatado}`, "info");
+
+    tudo_ok = true;
+    proximo_for = false;
+    trava = 0;
+    let retorno = { codcli: formatado };
+    let modificado = [];
+    let resposta;
+    const sql = `SELECT fat.codfat, sp.porcentagem, DATE_FORMAT(fat.data_ven, '%d/%m/%Y') as vencimento, c.nome_cli, c.endereco, c.bairro, cr.histo_rec, fat.status, fat.data_ven FROM contas_rec cr JOIN servicos_cli sc on sc.codsercli=cr.codsercli JOIN detalhe_faturas df ON df.codcrec = cr.codcrec JOIN faturas fat on fat.codfat= df.codfat JOIN clientes c on c.codcli = cr.codcli LEFT JOIN servicos_pant sp on sp.codser = sc.codser WHERE TRUE AND cr.codcli = '${formatado}' AND cr.data_bai is null AND cr.valor_lan-cr.valor_pag>0 AND fat.status != 'D' AND c.ativo='S' GROUP by fat.codfat ORDER BY data_ven;`;
+    
+    await INTE(sql).then((resp)=>{
+        resposta = resp;
+        if(resp.resposta.length === 0){
+            tudo_ok = false;
+            retorno.msg = "Não foram encontradas faturas para este cliente";
+            retorno.prospecto = "nao";
+            API(retorno, res, 200, tudo_ok);
+        }else{
+            log(`APP - ${resp.resposta[0].nome_cli} - ${resp.resposta.length} faturas`);
+            retorno.msg = "Confira suas faturas";
+            retorno.prospecto = "sim";
+        }
+    }).catch((erro)=>{
+        retorno.dados = erro;
+        tudo_ok = false;
+        retorno.msg = "Erro ao buscar no Banco de Dados do Integrator";
+        retorno.prospecto = "nao";
+        API(retorno, res, 200, tudo_ok);
+    });
+
+    if(retorno.prospecto === "sim"){
+
+        //Comparar dados do SELECT com dados do Integrator
+        for (const [index, fatura] of resposta.resposta.entries()) {
+            await ApiIntegrator(formatado, fatura.vencimento, fatura.vencimento).then((resp)=>{
+                resp.data.results.map((item, index)=>{
+                    if(parseInt(item.dias) > limite_dias){
+                        retorno.msg = "Alguns boletos apresentam problemas";
+                        retorno.prospecto = "sim";
+                        tudo_ok = false;
+                        log(`Vencimento:${fatura.vencimento} - Valor:${item.valor_com_juros} - Dias de Atraso:${item.dias}`, "erro");
+                    }else if(fatura.codfat == item.codfat){
+                        proximo_for = true;
+                        let obj = {
+                            cod_fatura: fatura.codfat,
+                            vencimento: fatura.vencimento,
+                            cliente: fatura.nome_cli,
+                            endereco: `${fatura.endereco} - ${fatura.bairro}`,
+                            decricao1: fatura.histo_rec,
+                            descricao2: item.descri_cob,
+                            percentual_desc: fatura.porcentagem,
+                            valor_normal: parseFloat(item.valor),
+                            valor_a_pagar: parseFloat(item.valor_com_juros)
+                        }
+                        parseInt(item.dias) <= 0 ? obj.dias_vencidos = 0 : obj.dias_vencidos = parseInt(item.dias);
+                        modificado.push(obj);
+                    }else{
+                      log(`Codfat não é igual: API:${item.codfat} - BD:${fatura.codfat}`, "erro");
+                    }
+
+                });
+                
+            })
+            .catch((erro)=>{
+                console.log(erro);
+                tudo_ok = false;
+                retorno.msg = "Erro ao buscar na API do Integrator o codcli";
+                retorno.erro = erro;
+            });
+        }
+
+        // PEGAR O CÓDIGO DE BARRAS DOS BOLETOS
+        for (const [index, item] of modificado.entries()) {
+            await Barra(item.cod_fatura).then((resp)=>{
+                item.codBarra = resp
+            })
+            .catch((erro)=>{
+                item.codBarra = ""
+                console.log(erro)
+            });
+        }
+
+        retorno.num_faturas = modificado.length;
+        retorno.boletos = modificado;
+
+      if(proximo_for){
+          //Pega o link do boleto
+          for (const [index, boleto] of retorno.boletos.entries()) {
+              tudo_ok = true;
+
+              await linkBoleto(boleto.cod_fatura).then((resp_link)=>{
+                  retorno.boletos[index].linkHtml = "http://177.38.178.24/" + resp_link.data.results[0].linkBoleto;
+              }).catch((err_link)=>{
+                  console.log("Erro Link", err_link);
+                  tudo_ok = false;
+                  retorno.msg = "Erro ao pegar o link do Boleto";
+                  retorno.erro = err_link;
+              });
+
+              await abrirHtml(retorno.boletos[index].linkHtml).then((resp_pdf)=>{
+                retorno.boletos[index].linkPDF = resp_pdf;      
+              }).catch((err_pdf)=>{
+                console.log("Erro PDF", err_pdf);
+                tudo_ok = false;
+                retorno.msg = "Erro ao extrair o link PDF do link HTML";
+                retorno.erro = err_pdf;
+              });
+            }
+
+      }
+
+      API(retorno, res, 200, tudo_ok);
+    }
+  }
+
+  async pagar(req, res){
+    const tipo = req.body.tipo; // 1 (Credito), 2 (Debito) ou 3 (Voucher)
+    const forma_pag = req.body.forma_pag; // 1 (A vista), 2 (Parc. vendedor)
+    const parcelas = req.body.parcelas // numero de parcelas
+    const valor = req.body.valor;
+    const cod_venda = req.body.cod_venda; // Código da venda (definido pelo programa)
+
+    const executar_pagamento = `./pagar COM0 ${tipo} ${forma_pag} ${parcelas} ${valor} ${cod_venda}`;
+
+      let retorno = { valor: req.body.valor }
+      exec(executar_pagamento, (error, stdout, stderr) => {
+          if (error) {
+              //console.log(`error: ${error}`);
+              //API(retorno, res, 200, true);
+          }
+          if (stdout) {
+            const mod = JSON.stringify(stdout);
+            console.log(mod);
+
+            const texto1 = pegar("VENDA\\n\\n", mod);
+            const texto2 = pegar("message ", mod);
+            const texto3 = pegar("transactionCode ", mod);
+            const texto4 = pegar("hostNsu ", mod);
+            const texto5 = pegar("cardBrand ", mod);
+            const texto6 = pegar("bin ", mod);
+            const texto7 = pegar("holder ", mod);
+            const texto8 = pegar("user reference ", mod);
+
+            retorno.cod = texto1;
+            retorno.message = texto2;
+            retorno.transactionCode = texto3;
+            retorno.hostNsu = texto4;
+            retorno.cardBrand = texto5;
+            retorno.bin = texto6;
+            retorno.holder = texto7;
+            retorno.user_reference = texto8;
+
+            API(retorno, res, 200, true);
+          }
+      });
+
   }
 
 }

@@ -1,8 +1,8 @@
 const mysql = require('mysql');
 
 
-// Conecta no BD da Micks
-module.exports = mysql.createConnection({
+// Conecta no BD do Integrator
+module.exports = mysql.createPool({
   host: process.env.DBI_HOST,
   user: process.env.DBI_USER,
   password: process.env.DBI_PASS,
