@@ -10,6 +10,8 @@ routes.post('/faturas', buscarCliente.faturas);
 routes.post('/faturas_app', buscarCliente.faturas_app);
 routes.post('/desbloqueio', buscarCliente.desbloqueio);
 routes.post('/pagar', buscarCliente.pagar);
+routes.post('/insert_user', buscarCliente.insert_user);
+routes.post('/login', buscarCliente.login);
 
 module.exports = routes;
 

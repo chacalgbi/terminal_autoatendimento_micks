@@ -2,6 +2,7 @@ const time  = require('../configs/dataHora');
 const log   = require('../configs/log');
 const API   = require('../configs/resposta_API');;
 const BD    = require('../configs/acessar_BD');
+const appBD = require('../app/appBD');
 const INTE  = require('../configs/integrator');
 const vCPF  = require('../configs/valida_cpf');
 const vCNPJ = require('../configs/valida_cnpj');
@@ -21,6 +22,56 @@ let tudo_ok = true;
 let proximo_for = false;
 let trava = 0;
 let limite_dias = 90;
+
+let fakerAdress = [
+  {correct: false, adress: 'Teste1'},
+  {correct: false, adress: 'Teste2'},
+  {correct: false, adress: 'Teste3'},
+  {correct: false, adress: 'Teste4'},
+  {correct: false, adress: 'Teste5'},
+  {correct: false, adress: 'Teste6'},
+  {correct: false, adress: 'Teste7'},
+  {correct: false, adress: 'Teste8'},
+  {correct: false, adress: 'Teste9'},
+  {correct: false, adress: 'Teste10'},
+  {correct: false, adress: 'Teste11'},
+  {correct: false, adress: 'Teste12'},
+  {correct: false, adress: 'Teste13'},
+  {correct: false, adress: 'Teste14'},
+  {correct: false, adress: 'Teste15'},
+]
+
+function sortAddress(adressCorrect){
+  let arrayTemp = fakerAdress;
+
+  //Código para ordenar o Array Temporário de forma aletória
+  for (let i = 0; i < arrayTemp.length; i++) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arrayTemp[i], arrayTemp[j]] = [arrayTemp[j], arrayTemp[i]];
+  }
+
+  //Tira apenas 4 itens do array temporário já embaralhado
+  let arrayCorrect = arrayTemp.slice(0, 5);
+
+  //Add o enredeço correto
+  arrayCorrect.push(adressCorrect)
+
+  //Embaralha novamente, agora apenas com 5 endereços e o correto entre eles
+  for (let i = 0; i < arrayCorrect.length; i++) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arrayCorrect[i], arrayCorrect[j]] = [arrayCorrect[j], arrayCorrect[i]];
+  }
+
+  // Insere ID em todos os objetos
+  let addID = []
+  arrayCorrect.map((item, index)=>{
+    let x = item;
+    x.id = index
+    addID.push(x)
+  })
+
+  return addID
+}
 
 function pegar(start, texto){
   let tamanho = start.length;
@@ -46,7 +97,8 @@ class buscarCliente{
 							cr.codcli as codigo, 
 							c.nome_cli, 
 							c.endereco,  
-							c.bairro,  
+							c.bairro,
+              c.aniversario,
 							sc.codsercli, 
 								DATEDIFF(CURDATE(), MIN(cr.data_ven)) as dias_venc 
 							FROM contas_rec cr 
@@ -68,6 +120,10 @@ class buscarCliente{
 					}else{
 						retorno.msg = "CPF Válido. Confira seu plano";
 						retorno.prospecto = "sim";
+
+            //Sortear endereço
+            const address = {correct: true, adress: resp.resposta[0].endereco}
+            retorno.listAdress = sortAddress(address);
 					}
 					isSucess = true;
 					retorno.dados = resp;
@@ -106,6 +162,11 @@ class buscarCliente{
             }else{
               retorno.msg = "CNPJ Válido. Confira seu plano";
               retorno.prospecto = "sim";
+
+              //Sortear endereço
+              const address = {correct: true, adress: resp.resposta[0].endereco}
+              retorno.listAdress = sortAddress(address);
+
             }
             retorno.dados = resp;
             API(retorno, res, 200, true);
@@ -457,6 +518,72 @@ class buscarCliente{
       });
 
   }
+
+	async insert_user(req, res){
+		let isSucess = false;
+		let retorno = {}
+		const sql1 = `SELECT * FROM users WHERE email='${req.body.email}';`;
+
+		await appBD(sql1).then((resp)=>{
+			if(resp.resposta.length === 0){
+				isSucess = true;
+			}else{
+				isSucess = false;
+				retorno.msg = "Este email já faz parte de um cadastro!";
+				retorno.dados = resp;
+			}
+		}).catch((erro)=>{
+			isSucess = false;
+			retorno.dados = erro;
+			retorno.msg = "Erro ao buscar usuário no Banco de Dados";
+			console.log(erro)
+		});
+
+		if(isSucess){
+			const sql2 = `INSERT INTO users (cod_cli, nome, email, senha, doc, celular) values ("${req.body.cod_cli}", "${req.body.nome}", "${req.body.email}", "${req.body.senha}", "${req.body.doc}", "${req.body.cel}");`;
+			await appBD(sql2).then((resp)=>{
+				if(resp.resposta.length === 0){
+					isSucess = false;
+					retorno.dados = resp;
+					retorno.msg = "Erro ao cadastrar usuário!";
+				}else{
+					isSucess = true;
+					retorno.dados = resp;
+					retorno.msg = "Usuário cadastrado com sucesso!";
+				}
+			}).catch((erro)=>{
+				retorno.dados = erro;
+				isSucess = false;
+				retorno.msg = "Erro ao cadastrar usuário no Banco de Dados";
+			});
+		}
+
+		API(retorno, res, 200, isSucess);
+	}
+
+	async login(req, res){
+		let isSucess = false;
+		let retorno = {}
+
+			const sql2 = `SELECT * FROM users WHERE email="${req.body.email}" AND senha="${req.body.senha}";`;
+			await appBD(sql2).then((resp)=>{
+				if(resp.resposta.length === 0){
+					isSucess = false;
+					retorno.dados = resp;
+					retorno.msg = "Usuário não encontrado, login interrompido!";
+				}else{
+					isSucess = true;
+					retorno.dados = resp;
+					retorno.msg = "Login efetuado com sucesso!";
+				}
+			}).catch((erro)=>{
+				retorno.dados = erro;
+				isSucess = false;
+				retorno.msg = "Erro ao logar usuário no Banco de Dados";
+			});
+
+		API(retorno, res, 200, isSucess);
+	}
 
 }
 module.exports = new buscarCliente();
