@@ -1,6 +1,6 @@
 const time  = require('../configs/dataHora');
 const log   = require('../configs/log');
-const API   = require('../configs/resposta_API');;
+const API   = require('../configs/resposta_API');
 const BD    = require('../configs/acessar_BD');
 const appBD = require('../app/appBD');
 const INTE  = require('../configs/integrator');
@@ -22,6 +22,7 @@ let tudo_ok = true;
 let proximo_for = false;
 let trava = 0;
 let limite_dias = 90;
+let id = 0;
 
 let fakerAdress = [
   {correct: false, adress: 'Teste1'},
@@ -107,6 +108,7 @@ class buscarCliente{
 							LEFT JOIN clientes c on c.codcli = cr.codcli 
 							WHERE TRUE  
 							AND c.cpf = '${req.body.cpf}' 
+              AND sc.codest != '020IN0W6LU' /*Cancelado*/
 							AND c.ativo = 'S' 
 							AND s.autentica_radius = 'S'  
 							and data_bai is null 
@@ -260,9 +262,9 @@ class buscarCliente{
                       descricao2: item.descri_cob,
                       percentual_desc: fatura.porcentagem,
                       valor_normal: parseFloat(item.valor),
-                      valor_a_pagar: parseFloat(item.valor_com_juros)
+                      valor_a_pagar: parseFloat(item.valor_com_juros),
+                      dias_vencidos: parseInt(item.dias)
                     }
-                    parseInt(item.dias) <= 0 ? obj.dias_vencidos = 0 : obj.dias_vencidos = parseInt(item.dias);
                     modificado.push(obj);
                   }else{
                     log(`Codfat não é igual: API:${item.codfat} - BD:${fatura.codfat}`, "erro");
@@ -362,6 +364,7 @@ class buscarCliente{
   async faturas_app(req, res){
     const formatado = req.body.codcli.replace(/\D+/g, "");
     log(`APP - Faturas do cliente: ${formatado}`, "info");
+    id = 0;
 
     tudo_ok = true;
     proximo_for = false;
@@ -405,6 +408,7 @@ class buscarCliente{
                     }else if(fatura.codfat == item.codfat){
                         proximo_for = true;
                         let obj = {
+                            id: id++,
                             cod_fatura: fatura.codfat,
                             vencimento: fatura.vencimento,
                             cliente: fatura.nome_cli,
@@ -413,9 +417,9 @@ class buscarCliente{
                             descricao2: item.descri_cob,
                             percentual_desc: fatura.porcentagem,
                             valor_normal: parseFloat(item.valor),
-                            valor_a_pagar: parseFloat(item.valor_com_juros)
+                            valor_a_pagar: parseFloat(item.valor_com_juros),
+                            dias_vencidos: parseInt(item.dias)
                         }
-                        parseInt(item.dias) <= 0 ? obj.dias_vencidos = 0 : obj.dias_vencidos = parseInt(item.dias);
                         modificado.push(obj);
                     }else{
                       log(`Codfat não é igual: API:${item.codfat} - BD:${fatura.codfat}`, "erro");
