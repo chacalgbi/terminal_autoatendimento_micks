@@ -93,28 +93,24 @@ class buscarCliente{
 		retorno.cpf = req.body.cpf;
 		if(req.body.cpf.length === 14){
 			if(vCPF(req.body.cpf)){
-				//const sql1 = `SELECT op.codocop, op.nome_ocop FROM oco_padrao op WHERE op.ativo = 'S'`;
-				const sql = `SELECT  
-							cr.codcli as codigo, 
-							c.nome_cli, 
-							c.endereco,  
-							c.bairro,
-              c.aniversario,
-							sc.codsercli, 
-								DATEDIFF(CURDATE(), MIN(cr.data_ven)) as dias_venc 
-							FROM contas_rec cr 
-							LEFT JOIN servicos_cli sc on sc.codsercli=cr.codsercli 
-							LEFT JOIN servicos s on s.codser = sc.codser 
-							LEFT JOIN clientes c on c.codcli = cr.codcli 
-							WHERE TRUE  
-							AND c.cpf = '${req.body.cpf}' 
-              AND sc.codest != '020IN0W6LU' /*Cancelado*/
-							AND c.ativo = 'S' 
-							AND s.autentica_radius = 'S'  
-							and data_bai is null 
-							and valor_lan > 0 
-							AND cr.valor_lan-cr.valor_pag>0 
-							GROUP by sc.codsercli`;
+				const sql = `
+        SELECT 
+          sc.codsercli
+        ,c.codcli as codigo
+        ,TRIM(c.nome_cli) as nome_cli
+        ,TRIM(c.endereco) as endereco
+        ,TRIM(s.descri_ser) as descri_ser
+        ,TRIM(c.bairro) as bairro
+        ,c.cpf
+        FROM servicos_cli sc 
+        JOIN clientes c on c.codcli=sc.codcli
+        join servicos s on s.codser=sc.codser
+        WHERE true 
+        and c.cpf = '${req.body.cpf}'
+        AND c.ativo = 'S' 
+        and sc.codest != '020IN0W6LU' /*Cancelado*/
+        AND s.autentica_radius = 'S';
+        `;
 				await INTE(sql).then((resp)=>{
 					if(resp.resposta.length === 0){
 						retorno.msg = "CPF Válido. Mas você não é cliente MICKS! :(";
@@ -156,7 +152,24 @@ class buscarCliente{
       let retorno = { cnpj: req.body.cnpj }
       if(req.body.cnpj.length === 18){
         if(vCNPJ(req.body.cnpj)){
-          const sql = `SELECT  c.codcli, c.nome_cli, c.endereco, c.bairro FROM servicos_cli sc JOIN clientes c on c.codcli=sc.codcli  JOIN servicos s on s.codser = sc.codser JOIN dados_pop un on sc.codpop=un.codpop WHERE TRUE AND c.ativo = 'S' AND sc.codest != '020IN0W6LU' AND s.autentica_radius = 'S' AND c.cnpj = '${req.body.cnpj}' GROUP by sc.codsercli`;
+          const sql = `
+        SELECT 
+        sc.codsercli
+        ,c.codcli as codigo
+        ,TRIM(c.nome_cli) as nome_cli
+        ,TRIM(c.endereco) as endereco
+        ,TRIM(s.descri_ser) as descri_ser
+        ,TRIM(c.bairro) as bairro
+        ,c.cpf
+        FROM servicos_cli sc 
+        JOIN clientes c on c.codcli=sc.codcli
+        join servicos s on s.codser=sc.codser
+        WHERE true 
+        and c.cpf = '${req.body.cnpj}'
+        AND c.ativo = 'S' 
+        and sc.codest != '020IN0W6LU' /*Cancelado*/
+        AND s.autentica_radius = 'S';
+          `;
           await INTE(sql).then((resp)=>{
             if(resp.resposta.length === 0){
               retorno.msg = "CNPJ Válido. Mas você não é cliente MICKS! :(";
@@ -192,20 +205,27 @@ class buscarCliente{
   }
 
   async desbloqueio(req, res){
-    tudo_ok = true;
-    const codsercli = req.body.codsercli;
-    let retorno = { codsercli: codsercli };
-    await ApiIntegrator_desbloqueio(codsercli).then((resp)=>{
-      log(resp.exception);
-      retorno.dados = resp;
+      tudo_ok = true;
+      const codsercli = req.body.codsercli;
+      let retorno = { codsercli: codsercli };
+      await ApiIntegrator_desbloqueio(codsercli).then((resp)=>{
+          log(resp);
+          retorno.dados = resp;
+
+          if(resp.error === true){
+              tudo_ok = false;
+              retorno.msg = `${resp.exception}`;
+          }else{
+              retorno.msg = "Habilitação provisória efetuada com sucesso! Aguarde 2 minutos, caso não volte sua internet, reinicie seus equipamentos";
+          }  
+          
+      }).catch((erro)=>{
+          retorno.dados = erro;
+          tudo_ok = false;
+          retorno.msg = "Erro ao buscar no nosso Banco de Dados";      
+      });
+
       API(retorno, res, 200, tudo_ok);
-    }).catch((erro)=>{
-      retorno.dados = erro;
-      tudo_ok = false;
-      retorno.msg = "Erro ao buscar no Banco de Dados do Integrator";
-      retorno.prospecto = "nao";
-      API(retorno, res, 200, tudo_ok);
-    });
   }
 
   async faturas(req, res){
@@ -544,8 +564,13 @@ class buscarCliente{
 		});
 
 		if(isSucess){
-			const sql2 = `INSERT INTO users (cod_cli, nome, email, senha, doc, celular) values ("${req.body.cod_cli}", "${req.body.nome}", "${req.body.email}", "${req.body.senha}", "${req.body.doc}", "${req.body.cel}");`;
-			await appBD(sql2).then((resp)=>{
+			const sql2 = `
+      INSERT INTO users 
+        (cod_cli, nome, email, senha, doc, celular, codsercli, descriSer) 
+      values 
+        ("${req.body.cod_cli}", "${req.body.nome}", "${req.body.email}", "${req.body.senha}", "${req.body.doc}", "${req.body.cel}", "${req.body.codsercli}", "${req.body.descriSer}");`;
+			
+        await appBD(sql2).then((resp)=>{
 				if(resp.resposta.length === 0){
 					isSucess = false;
 					retorno.dados = resp;
