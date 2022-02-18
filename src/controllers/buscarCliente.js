@@ -243,9 +243,9 @@ class buscarCliente{
     await INTE(sql).then((resp)=>{
         resposta = resp;
         if(resp.resposta.length === 0){
-          tudo_ok = false;
-          retorno.msg = "Não foram encontradas faturas para este cliente";
+          retorno.msg = "Não foram encontradas faturas para este Plano";
           retorno.prospecto = "nao";
+          retorno.boletos = []
           API(retorno, res, 200, tudo_ok);
         }else{
           log(`${resp.resposta[0].nome_cli} - ${resp.resposta.length} faturas`);
@@ -397,9 +397,9 @@ class buscarCliente{
     await INTE(sql).then((resp)=>{
         resposta = resp;
         if(resp.resposta.length === 0){
-            tudo_ok = false;
-            retorno.msg = "Não foram encontradas faturas para este cliente";
+            retorno.msg = "Não foram encontradas faturas para este plano";
             retorno.prospecto = "nao";
+            retorno.boletos = []
             API(retorno, res, 200, tudo_ok);
         }else{
             log(`APP - ${resp.resposta[0].nome_cli} - ${resp.resposta.length} faturas`);
