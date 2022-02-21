@@ -592,24 +592,114 @@ class buscarCliente{
 
 	async login(req, res){
 		let isSucess = false;
-		let retorno = {}
+		let retorno = {};
+    let idCli = 0;
 
-			const sql2 = `SELECT * FROM users WHERE email="${req.body.email}" AND senha="${req.body.senha}";`;
-			await appBD(sql2).then((resp)=>{
-				if(resp.resposta.length === 0){
-					isSucess = false;
-					retorno.dados = resp;
-					retorno.msg = "Usuário não encontrado, login interrompido!";
-				}else{
-					isSucess = true;
-					retorno.dados = resp;
-					retorno.msg = "Login efetuado com sucesso!";
-				}
+    const sql2 = `SELECT * FROM users WHERE email="${req.body.email}" AND senha="${req.body.senha}";`;
+    await appBD(sql2).then((resp)=>{
+      if(resp.resposta.length === 0){
+        isSucess = false;
+        retorno.dados = resp;
+        retorno.msg = "Usuário não encontrado, login interrompido!";
+      }else{
+        idCli = resp.resposta[0].id;
+        isSucess = true;
+        retorno.dados = resp;
+        retorno.msg = "Login efetuado com sucesso!";
+      }
+    }).catch((erro)=>{
+      retorno.dados = erro;
+      isSucess = false;
+      retorno.msg = "Erro ao logar usuário no Banco de Dados";
+    });
+    
+    if(isSucess === true){
+      const sql3 = `UPDATE users SET ultimo_acesso=NOW(), token="${req.body.token}" WHERE id="${idCli}";`;
+			await appBD(sql3).then((resp)=>{
+        console.log("Token Atualizado")
 			}).catch((erro)=>{
-				retorno.dados = erro;
-				isSucess = false;
-				retorno.msg = "Erro ao logar usuário no Banco de Dados";
+        console.log("Erro ao atualizar Token")
+        console.log(erro)
 			});
+    }
+
+		API(retorno, res, 200, isSucess);
+	}
+
+  async isgetapp(req, res){
+		let isSucess = false;
+		let retorno = {};
+
+    const sql = `UPDATE users SET ultimo_acesso=NOW() WHERE email="${req.body.email}";`;
+    await appBD(sql).then((resp)=>{
+      console.log(`${req.body.email} logou no APP`)
+      isSucess = true
+      retorno.msg = "Sucesso!"
+    }).catch((erro)=>{
+      isSucess = false;
+      retorno.msg = "Erro ao atualizar ultimo_acesso"
+      console.log("Erro ao atualizar ultimo_acesso")
+      console.log(erro)
+    });
+
+		API(retorno, res, 200, isSucess);
+	}
+
+  async isBlocked(req, res){
+		let isSucess = false;
+		let retorno = {};
+    let temp = []
+    let codClients = req.body.codCli.split(',')
+
+    for (const [index, cod] of codClients.entries()) {
+      const sql = `
+      SELECT 
+        fat.codfat, 
+        DATE_FORMAT(fat.data_ven, '%d/%m/%Y') as vencimento, 
+        c.nome_cli, 
+        cr.histo_rec,
+        sc.codest,
+        sc.codsercli
+      FROM contas_rec cr 
+      JOIN servicos_cli sc on sc.codsercli=cr.codsercli 
+      JOIN detalhe_faturas df ON df.codcrec = cr.codcrec 
+      JOIN faturas fat on fat.codfat= df.codfat 
+      JOIN clientes c on c.codcli = cr.codcli 
+      LEFT JOIN servicos_pant sp on sp.codser = sc.codser 
+      WHERE TRUE 
+      AND cr.codcli = '${cod}' 
+      AND cr.data_bai is null 
+      AND cr.valor_lan-cr.valor_pag>0 
+      AND fat.status != 'D' 
+      AND c.ativo='S' 
+      GROUP by fat.codfat;
+      `;
+      await INTE(sql).then((resp)=>{
+        isSucess = true
+        retorno.msg = "Sucesso!"
+        resp.resposta.map((item, index)=>{
+          let suspenso = false
+          if(item.codest === '020IU10JW1'){  // Código do integrator que indica cliente suspenso por falta de pagamento
+            suspenso = true
+          }
+          temp.push({
+            nome: item.nome_cli, 
+            plano: item.histo_rec, 
+            vencimento: item.vencimento, 
+            codcli: cod, 
+            codsercli: item.codsercli, 
+            suspenso: suspenso
+          })
+        })
+      }).catch((erro)=>{
+        isSucess = false;
+        retorno.msg = "Erro ao buscar os Planos Bloqueados"
+        console.log("Erro ao buscar os Planos Bloqueados")
+        console.log(erro)
+      });
+    }
+
+    retorno.dados = temp
 
 		API(retorno, res, 200, isSucess);
 	}

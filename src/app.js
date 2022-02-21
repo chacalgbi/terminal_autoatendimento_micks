@@ -1,6 +1,7 @@
 const express = require("express");
 const routes = require('./routes');
 const cors = require('cors');
+const agendamento = require('./agendamento')
 
 const app = express();
 
@@ -9,6 +10,7 @@ class App{
       this.app = express();
       this.middlewares();
       this.routes();
+      agendamento
   }
   middlewares(){
     this.app.use(express.json());

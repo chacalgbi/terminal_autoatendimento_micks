@@ -12,6 +12,8 @@ routes.post('/desbloqueio', buscarCliente.desbloqueio);
 routes.post('/pagar', buscarCliente.pagar);
 routes.post('/insert_user', buscarCliente.insert_user);
 routes.post('/login', buscarCliente.login);
+routes.post('/isgetapp', buscarCliente.isgetapp);
+routes.post('/isBlocked', buscarCliente.isBlocked);
 
 module.exports = routes;
 
