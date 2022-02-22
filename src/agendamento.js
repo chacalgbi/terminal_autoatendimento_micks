@@ -12,10 +12,8 @@ const tokens = [
 
 // Criar os agendamentos neste site http://www.cronmaker.com/?1   
 const cron1 = '*/1 * * * *';                         // Executa a cada 1 minuto 
-const cron2 = '0 0 8 ? * MON,TUE,WED,THU,FRI,SAT *'  // Segunda a sábado as 08:00
+const cron2 = '0 0 9 ? * MON,TUE,WED,THU,FRI,SAT *'  // Segunda a sábado as 08:00
 
 module.exports = nodeSchedule.scheduleJob(cron2, () => {
     notify(micksapp, "Micks Informa", "Promoção de carnaval é na Micks Telecom")
 });
-
-//console.log(job.nextInvocation());

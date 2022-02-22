@@ -2,6 +2,7 @@ const time  = require('../configs/dataHora');
 const log   = require('../configs/log');
 const API   = require('../configs/resposta_API');
 const BD    = require('../configs/acessar_BD');
+const RAD   = require('../configs/acessar_radius');
 const appBD = require('../app/appBD');
 const INTE  = require('../configs/integrator');
 const vCPF  = require('../configs/valida_cpf');
@@ -83,6 +84,16 @@ function pegar(start, texto){
   return texto.substring(inicio, fim).trim();
 }
 
+function sformat(s) {
+  var fm = [
+        Math.floor(s / 60 / 60 / 24), // dias
+        Math.floor(s / 60 / 60) % 24, // horas
+        Math.floor(s / 60) % 60, // minutos
+        s % 60 // segundos
+  ];
+  return `${fm[0]}d ${fm[1]}h:${fm[2]}m:${fm[3]}s`
+}
+
 class buscarCliente{
 
   async cpf(req, res){
@@ -102,9 +113,11 @@ class buscarCliente{
         ,TRIM(s.descri_ser) as descri_ser
         ,TRIM(c.bairro) as bairro
         ,c.cpf
+        ,lr.login 
         FROM servicos_cli sc 
         JOIN clientes c on c.codcli=sc.codcli
         join servicos s on s.codser=sc.codser
+        join login_radius lr on lr.codsercli=sc.codsercli 
         WHERE true 
         and c.cpf = '${req.body.cpf}'
         AND c.ativo = 'S' 
@@ -161,9 +174,11 @@ class buscarCliente{
         ,TRIM(s.descri_ser) as descri_ser
         ,TRIM(c.bairro) as bairro
         ,c.cpf
+        ,lr.login 
         FROM servicos_cli sc 
         JOIN clientes c on c.codcli=sc.codcli
         join servicos s on s.codser=sc.codser
+        join login_radius lr on lr.codsercli=sc.codsercli 
         WHERE true 
         and c.cpf = '${req.body.cnpj}'
         AND c.ativo = 'S' 
@@ -566,9 +581,9 @@ class buscarCliente{
 		if(isSucess){
 			const sql2 = `
       INSERT INTO users 
-        (cod_cli, nome, email, senha, doc, celular, codsercli, descriSer) 
+        (cod_cli, nome, email, senha, doc, celular, codsercli, descriSer, login) 
       values 
-        ("${req.body.cod_cli}", "${req.body.nome}", "${req.body.email}", "${req.body.senha}", "${req.body.doc}", "${req.body.cel}", "${req.body.codsercli}", "${req.body.descriSer}");`;
+        ("${req.body.cod_cli}", "${req.body.nome}", "${req.body.email}", "${req.body.senha}", "${req.body.doc}", "${req.body.cel}", "${req.body.codsercli}", "${req.body.descriSer}", "${req.body.login}");`;
 			
         await appBD(sql2).then((resp)=>{
 				if(resp.resposta.length === 0){
@@ -700,6 +715,53 @@ class buscarCliente{
     }
 
     retorno.dados = temp
+
+		API(retorno, res, 200, isSucess);
+	}
+
+  async conection(req, res){
+		let isSucess = false;
+		let retorno = {};
+
+      // Ultimas conexões
+      const sql = `
+      SELECT  
+        DATE_FORMAT(acctstarttime, '%d/%m/%Y %H:%i') as inicio,
+        DATE_FORMAT(acctstoptime,  '%d/%m/%Y %H:%i') as fim,
+        ROUND(((acctoutputoctets/1024)/1024), 2) as down,
+        ROUND(((acctinputoctets/1024)/1024), 2) as uplo,
+        (ROUND(((acctoutputoctets/1024)/1024), 2) + ROUND(((acctinputoctets/1024)/1024), 2)) as total,
+        TIMESTAMPDIFF(SECOND, acctstarttime, IFNULL(acctstoptime, NOW())) as segundos
+      from radacct r
+      WHERE TRUE 
+      AND r.username = "${req.body.login}"
+      ORDER  BY acctstarttime DESC LIMIT ${req.body.conexoes};
+      `;
+      await RAD(sql).then((resp)=>{
+        isSucess = true
+        retorno.msg = "Confira seu extrato de conexão"
+
+        let data = []
+
+        resp.resposta.map((item, index)=>{
+          let obj = {
+            inicio: item.inicio,
+            fim: item.fim,
+            download: item.down < 1000 ? `${item.down.toFixed(2)}MB` : `${(item.down / 1024).toFixed(2)}GB`,
+            upload: item.uplo < 1000 ? `${item.uplo.toFixed(2)}MB` : `${(item.uplo / 1024).toFixed(2)}GB`,
+            total: item.total < 1000 ? `${item.total.toFixed(2)}MB` : `${(item.total / 1024).toFixed(2)}GB`,
+            tempo: sformat(item.segundos)
+          }
+          data.push(obj)
+        })
+        retorno.dados = data        
+
+      }).catch((erro)=>{
+        isSucess = false;
+        retorno.msg = "Erro ao buscar o extrato de conexão"
+        console.log("Erro ao buscar o extrato de conexão")
+        console.log(erro)
+      });
 
 		API(retorno, res, 200, isSucess);
 	}
