@@ -735,16 +735,24 @@ class buscarCliente{
       from radacct r
       WHERE TRUE 
       AND r.username = "${req.body.login}"
-      ORDER  BY acctstarttime DESC LIMIT ${req.body.conexoes};
+      AND r.acctstoptime is null
+      OR (r.acctstarttime >= CURDATE() - INTERVAL ${req.body.dias} DAY and r.username = "${req.body.login}")
+      ORDER  BY acctstarttime DESC;
       `;
       await RAD(sql).then((resp)=>{
         isSucess = true
         retorno.msg = "Confira seu extrato de conexão"
 
         let data = []
+        let totalDo = 0
+        let totalUp = 0
 
         resp.resposta.map((item, index)=>{
+          totalDo = totalDo + item.down
+          totalUp = totalUp + item.uplo
+
           let obj = {
+            id: index,  
             inicio: item.inicio,
             fim: item.fim,
             download: item.down < 1000 ? `${item.down.toFixed(2)}MB` : `${(item.down / 1024).toFixed(2)}GB`,
@@ -754,7 +762,9 @@ class buscarCliente{
           }
           data.push(obj)
         })
-        retorno.dados = data        
+        retorno.dados = data
+        retorno.totalDo = totalDo < 1000 ? `${totalDo.toFixed(2)}MB` : `${(totalDo / 1024).toFixed(2)}GB`
+        retorno.totalUp = totalUp < 1000 ? `${totalUp.toFixed(2)}MB` : `${(totalUp / 1024).toFixed(2)}GB`
 
       }).catch((erro)=>{
         isSucess = false;

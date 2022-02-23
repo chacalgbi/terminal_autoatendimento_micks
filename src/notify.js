@@ -17,6 +17,7 @@ module.exports = function enviar(tokens, title, body){
     firebase.messaging().sendToDevice(tokens, payload, options)
     .then((res) => {
         console.log('Enviado para:', res.successCount, "dispositivos");
+        //console.log(res);
     })
     .catch((error) => {
         console.log('Error:', error);

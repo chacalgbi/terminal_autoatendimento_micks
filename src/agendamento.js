@@ -2,7 +2,7 @@ const nodeSchedule = require('node-schedule');
 const notify = require('./notify')
 
 const token = 'cjKTqeXCSNS7_75YML_8Or:APA91bGUX2MW13FTcpISqtR4evlGeX3txVXczS0qohQjGX8VCW9YORrjrQKyJxUxifonNtSCsWXbaifJptYiVsga9bEj-qr9yTKyAenKzUR2ylQx1wfAcrnwqLU_dfqO0zBm1C3UKNNu'
-const micksapp = 'fCqGINxsRjOgOnP1i3Mq5n:APA91bEMb7ORGbXoHOMHLwLFBy08Ups8DNRjLEvijSy2JolLe8DLQvLKQo_GAAjoCjQK_MzDXADChVbkuKBXfpqJNQvckc2HMlz33NzjUxz0dEtS1ohZRi9ZTSGvaguoktccK37cEC2b'
+const micksapp = 'dMeCY6jwTC-Ujw52xZ4WV6:APA91bGKJvslitu4yoVt_IOZ5Kfqjr8DwWeroyvwdjtctikowKk9mGdyJYK6Om9X4F531WIgY0pLQUJ56DC6-SEKMHHJbXGNxz3GxfuBRb1OdETcD8b58dZJmFk9nMGm4RBK4iMYt1xV'
 const tokens = [
     "cjKTqeXCSNS7_75YML_8Or:APA91bGUX2MW13FTcpISqtR4evlGeX3txVXczS0qohQjGX8VCW9YORrjrQKyJxUxifonNtSCsWXbaifJptYiVsga9bEj-qr9yTKyAenKzUR2ylQx1wfAcrnwqLU_dfqO0zBm1C3UKNNu",
     "fPsrHBTQQLe8KQ4cIck-Jy:APA91bEZkkQtoo1CpTdrcAGKyZKyyAizhHwlX9D0llwYjW0LZRBspqT2yy3Vm9tjA1pbxW4Ld6UQjqCAnrOpbz6RE10BUXUy2XRq0jLqwOzzZVB_Z0Yc4PN56RBwnZGANITYYyGwUV9O",
@@ -14,6 +14,6 @@ const tokens = [
 const cron1 = '*/1 * * * *';                         // Executa a cada 1 minuto 
 const cron2 = '0 0 9 ? * MON,TUE,WED,THU,FRI,SAT *'  // Segunda a sábado as 08:00
 
-module.exports = nodeSchedule.scheduleJob(cron2, () => {
+module.exports = nodeSchedule.scheduleJob(cron1, () => {
     notify(micksapp, "Micks Informa", "Promoção de carnaval é na Micks Telecom")
 });
