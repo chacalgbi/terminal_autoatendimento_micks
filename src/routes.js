@@ -15,6 +15,7 @@ routes.post('/login', buscarCliente.login);
 routes.post('/isgetapp', buscarCliente.isgetapp);
 routes.post('/isBlocked', buscarCliente.isBlocked);
 routes.post('/conection', buscarCliente.conection);
+routes.post('/esqueci_senha', buscarCliente.esqueci_senha);
 
 module.exports = routes;
 

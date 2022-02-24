@@ -17,6 +17,7 @@ const lerPdf = require('../configs/ler_pdf');
 const apagar = require('../configs/apagar_boleto');
 const delay = require('../configs/delay');
 const path = './files/boleto.pdf';
+const email_env = require('../email');
 const { exec } = require('child_process');
 
 let tudo_ok = true;
@@ -42,6 +43,15 @@ let fakerAdress = [
   {correct: false, adress: 'Teste14'},
   {correct: false, adress: 'Teste15'},
 ]
+
+function geraStringAleatoria(tamanho) {
+  var stringAleatoria = '';
+  var caracteres = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  for (var i = 0; i < tamanho; i++) {
+      stringAleatoria += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+  }
+  return stringAleatoria;
+}
 
 function sortAddress(adressCorrect){
   let arrayTemp = fakerAdress;
@@ -610,10 +620,11 @@ class buscarCliente{
 		let retorno = {};
     let idCli = 0;
 
-    const sql2 = `SELECT * FROM users WHERE email="${req.body.email}" AND senha="${req.body.senha}";`;
+    const sql2 = `SELECT * FROM users WHERE email="${req.body.email}" AND senha="${req.body.senha}" OR email="${req.body.email}" AND senha_temp="${req.body.senha}";`;
     await appBD(sql2).then((resp)=>{
       if(resp.resposta.length === 0){
         isSucess = false;
+        senha_invalida = true
         retorno.dados = resp;
         retorno.msg = "Usuário não encontrado, login interrompido!";
       }else{
@@ -627,11 +638,11 @@ class buscarCliente{
       isSucess = false;
       retorno.msg = "Erro ao logar usuário no Banco de Dados";
     });
-    
+  
     if(isSucess === true){
       const sql3 = `UPDATE users SET ultimo_acesso=NOW(), token="${req.body.token}" WHERE id="${idCli}";`;
 			await appBD(sql3).then((resp)=>{
-        console.log("Token Atualizado")
+        console.log("ultimo_acesso e Token Atualizado")
 			}).catch((erro)=>{
         console.log("Erro ao atualizar Token")
         console.log(erro)
@@ -772,6 +783,47 @@ class buscarCliente{
         console.log("Erro ao buscar o extrato de conexão")
         console.log(erro)
       });
+
+		API(retorno, res, 200, isSucess);
+	}
+
+  async esqueci_senha(req, res){
+		let isSucess = false;
+    let retorno = {}
+    let senha_provisoria = `micks${geraStringAleatoria(6)}`
+    let email_enviado = false
+
+    let corpo = `Bem-vindo a redefinição de senha do MicksApp. Sua senha temporária é:
+    
+${senha_provisoria}
+
+Recomendamos alterar essa senha assim que entrar no APP. Caso não tenha feito essa solicitação, pode usar sua senha antiga normalmente.
+
+Att,
+MICKS TELECOM`;
+
+    await email_env(req.body.email, "Redefinição de senha do MicksApp", corpo)
+    .then((resp) => {
+      console.log(resp);
+      isSucess = true
+      email_enviado = true
+      retorno.msg = `Senha temporária enviada para o email: ${req.body.email}. Pode demorar até 10 minutos para o email ser recebido.`
+    })
+    .catch((err) => { 
+      console.error(err);
+      retorno.msg = `Erro ao enviar para o email: ${req.body.email}.`
+    });
+
+    if(email_enviado === true){
+      const sql2 = `UPDATE users SET senha_temp='${senha_provisoria}' WHERE email="${req.body.email}";`;
+      await appBD(sql2).then((resp)=>{
+        isSucess = true
+        retorno.msg1 = "Senha temporária salva!"
+      }).catch((erro)=>{
+        isSucess = false;
+        retorno.msg1 = "Erro ao salvar senha!"
+      });
+    }
 
 		API(retorno, res, 200, isSucess);
 	}
