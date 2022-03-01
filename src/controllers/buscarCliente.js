@@ -828,5 +828,43 @@ MICKS TELECOM`;
 		API(retorno, res, 200, isSucess);
 	}
 
+  async modify_password(req, res){
+		let isSucess = false;
+		let retorno = {};
+
+    const sql = `UPDATE users SET senha="${req.body.senha}" WHERE email="${req.body.email}";`;
+    await appBD(sql).then((resp)=>{
+      console.log(`Senha modificada de ${req.body.email}`)
+      isSucess = true
+      retorno.msg = "Senha modificada com sucesso!"
+    }).catch((erro)=>{
+      isSucess = false;
+      retorno.msg = "Erro ao mudar a senha"
+      console.log("Erro ao mudar a senha")
+      console.log(erro)
+    });
+
+		API(retorno, res, 200, isSucess);
+	}
+
+  async evaluation(req, res){
+		let isSucess = false;
+		let retorno = {};
+
+    const sql = `UPDATE users SET nota="${req.body.nota}" WHERE email="${req.body.email}";`;
+    await appBD(sql).then((resp)=>{
+      console.log(`Nota salva ${req.body.email}`)
+      isSucess = true
+      retorno.msg = "Nota salva com sucesso!"
+    }).catch((erro)=>{
+      isSucess = false;
+      retorno.msg = "Erro ao salvar a nota"
+      console.log("Erro ao salvar a nota")
+      console.log(erro)
+    });
+
+		API(retorno, res, 200, isSucess);
+	}
+
 }
 module.exports = new buscarCliente();

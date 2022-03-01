@@ -20,6 +20,8 @@ const DayWelk = (number) => {
 const dataDayFormat = () => {
     var data = new Date()
     dia = data.getDate().toString()
+    tomorrow = (data.getDate() + 1).toString()
+    tomorrowF = tomorrow.length == 1 ? '0' + tomorrow : tomorrow
     diaF = (dia.length == 1) ? '0' + dia : dia
     mes = (data.getMonth() + 1).toString() //+1 pois no getMonth Janeiro começa com zero.
     mesF = (mes.length == 1) ? '0' + mes : mes
@@ -35,6 +37,7 @@ const dataDayFormat = () => {
     return {
         dateHour: `${diaF}/${mesF}/${anoF}-${horaF}:${minutosF}:${segundosf}`,
         dateAll: `${diaF}/${mesF}/${anoF}`,
+        tomorrow1: `${anoF}-${mesF}-${tomorrowF} 00:00:00`,
         hourAll: `${horaF}:${minutosF}:${segundosf}`,
         hour: `${horaF}`,
         minutes: minutosF,
