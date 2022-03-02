@@ -17,10 +17,10 @@ const DayWelk = (number) => {
     }
 }
 
-const dataDayFormat = () => {
+const dataDayFormat = (dias) => {
     var data = new Date()
     dia = data.getDate().toString()
-    tomorrow = (data.getDate() + 1).toString()
+    tomorrow = (data.getDate() + dias).toString()
     tomorrowF = tomorrow.length == 1 ? '0' + tomorrow : tomorrow
     diaF = (dia.length == 1) ? '0' + dia : dia
     mes = (data.getMonth() + 1).toString() //+1 pois no getMonth Janeiro começa com zero.

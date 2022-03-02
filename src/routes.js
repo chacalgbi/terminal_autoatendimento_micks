@@ -18,6 +18,7 @@ routes.post('/conection', buscarCliente.conection);
 routes.post('/esqueci_senha', buscarCliente.esqueci_senha);
 routes.post('/modify_password', buscarCliente.modify_password);
 routes.post('/evaluation', buscarCliente.evaluation);
+routes.post('/atendimento', buscarCliente.atendimento);
 
 module.exports = routes;
 

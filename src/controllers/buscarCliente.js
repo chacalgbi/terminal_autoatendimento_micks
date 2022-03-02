@@ -10,6 +10,7 @@ const vCNPJ = require('../configs/valida_cnpj');
 const Barra = require('../configs/barra');
 const ApiIntegrator = require('../configs/api_integrator');
 const ApiIntegrator_desbloqueio = require('../configs/api_integrator_desbloqueio');
+const ApiIntegrator_atendimento = require('../configs/api_integrator_atendimento');
 const linkBoleto = require('../configs/integrator_verBoleto');
 const abrirHtml = require('../configs/abrir_html');
 const baixarPdf = require('../configs/baixar_pdf');
@@ -865,6 +866,38 @@ MICKS TELECOM`;
 
 		API(retorno, res, 200, isSucess);
 	}
+
+  async atendimento(req, res){
+    console.log(req.body)
+    let isSucess = false
+		let retorno = {}
+    let descricao = `MicksApp - Contato: ${req.body.cel} - Problema: ${req.body.obs.replace(/'|"|\n|\r|\r\n/g, "")}`
+    let codOcorrencia = ''
+    let codUsu_d = ''
+    /*
+    E9 Lucas Vieira Costa
+    G3 ILCIARA MESQUITA NASCIMENTO
+    
+    */
+         if(req.body.motivo === "Sem internet")  {codOcorrencia = 'E9YA0NDABX', codUsu_d = 'E9'}
+    else if(req.body.motivo === "Internet lenta"){codOcorrencia = 'E9YA0NCGK8', codUsu_d = 'E9'}
+    else if(req.body.motivo === "Financeiro")    {codOcorrencia = 'E9Y80KGGLR', codUsu_d = 'E9'}
+    else if(req.body.motivo === "Outros")        {codOcorrencia = 'E9Y40WWMKX', codUsu_d = 'E9'}
+
+    await ApiIntegrator_atendimento(req.body.codsercli, req.body.codcli, descricao, codOcorrencia, codUsu_d).then((resp)=>{
+        isSucess = true
+        retorno.msg = "Atendimento cadastrado com sucesso!"
+        retorno.dados = resp
+    })
+    .catch((erro)=>{
+        console.log(erro)
+        isSucess = false
+        retorno.msg = "Erro ao cadastra Atendimento"
+        retorno.erro = erro
+    });
+
+    API(retorno, res, 200, isSucess);
+  }
 
 }
 module.exports = new buscarCliente();
