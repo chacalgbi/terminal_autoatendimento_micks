@@ -8,8 +8,8 @@ const INTE  = require('./configs/integrator');
 const data = require('../dataDay')
 let listUsers
 const sql1 = `SELECT * FROM users`;
-const dias = 18
-const regra = { hour: 20, minute: 00 }
+const dias = 17
+const regra = { hour: 15, minute: 53 }
 
 async function usersApp(){
     console.clear()

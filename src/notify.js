@@ -6,20 +6,28 @@ firebase.initializeApp({ credential: firebase.credential.cert(service) });
 const options = {priority: 'high', timeToLive: 60 * 60 * 24}
 
 module.exports = function enviar(tokens, title, body){
-    const payload = {
-        notification: {
-            title: title,
-            body: body,
-            color: '#0000FF',
+    return new Promise((resolve , reject)=>{
+        let obj = {}
+        const payload = {
+            notification: {
+                title: title,
+                body: body
+            }
         }
-    }
+    
+        firebase.messaging().sendToDevice(tokens, payload, options)
+        .then((res) => {
+            obj.erro = false
+            obj.envios = res.successCount
+            obj.msg = `Enviado para ${res.successCount} dispositivos`
+            resolve(obj)
+        })
+        .catch((error) => {
+            obj.erro = true
+            obj.envios = 0
+            obj.msg = error
+            reject(obj)
+        });
 
-    firebase.messaging().sendToDevice(tokens, payload, options)
-    .then((res) => {
-        console.log('Enviado para:', res.successCount, "dispositivos");
-        //console.log(res);
     })
-    .catch((error) => {
-        console.log('Error:', error);
-    });
 }

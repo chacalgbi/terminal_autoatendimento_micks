@@ -1,6 +1,6 @@
 var axios = require("axios").default;
 
-module.exports = function API_Integrator_atendimento(codsercli, codcli, desc, ocorrencia, codUsu_d){
+module.exports = function API_Integrator_atendimento(codsercli, codcli, desc, ocorrencia, codUsu_d, codUsu){
   
     var options = {
         method: 'POST',
@@ -18,7 +18,7 @@ module.exports = function API_Integrator_atendimento(codsercli, codcli, desc, oc
               codocop: ocorrencia, 
               codsercli: codsercli, 
               descri_oco: desc, 
-              codusu: "E9",  //Usuário MicksApp
+              codusu: codUsu,
               codusu_d: codUsu_d, 
               codcatoco: "01DD0UVGAQ", 
               codmvis: "PROBLEMA"

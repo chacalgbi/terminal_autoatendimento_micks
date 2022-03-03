@@ -19,6 +19,7 @@ routes.post('/esqueci_senha', buscarCliente.esqueci_senha);
 routes.post('/modify_password', buscarCliente.modify_password);
 routes.post('/evaluation', buscarCliente.evaluation);
 routes.post('/atendimento', buscarCliente.atendimento);
+routes.post('/envio_massivo', buscarCliente.envio_massivo);
 
 module.exports = routes;
 

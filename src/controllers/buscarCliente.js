@@ -19,6 +19,7 @@ const apagar = require('../configs/apagar_boleto');
 const delay = require('../configs/delay');
 const path = './files/boleto.pdf';
 const email_env = require('../email');
+const notify = require('../notify')
 const { exec } = require('child_process');
 
 let tudo_ok = true;
@@ -28,21 +29,21 @@ let limite_dias = 90;
 let id = 0;
 
 let fakerAdress = [
-  {correct: false, adress: 'Teste1'},
-  {correct: false, adress: 'Teste2'},
-  {correct: false, adress: 'Teste3'},
-  {correct: false, adress: 'Teste4'},
-  {correct: false, adress: 'Teste5'},
-  {correct: false, adress: 'Teste6'},
-  {correct: false, adress: 'Teste7'},
-  {correct: false, adress: 'Teste8'},
-  {correct: false, adress: 'Teste9'},
-  {correct: false, adress: 'Teste10'},
-  {correct: false, adress: 'Teste11'},
-  {correct: false, adress: 'Teste12'},
-  {correct: false, adress: 'Teste13'},
-  {correct: false, adress: 'Teste14'},
-  {correct: false, adress: 'Teste15'},
+  {correct: false, adress: 'RUA TOMAZ GONZAGA, 127'},
+  {correct: false, adress: 'AV. CASTELO BRANCO 6478'},
+  {correct: false, adress: 'TRAV. CASTRO ALVES, 41'},
+  {correct: false, adress: 'RUA COSTA BEZERRA, 45'},
+  {correct: false, adress: 'PRAÇA DOS TAMOIOS, S/n'},
+  {correct: false, adress: 'AV. 31 DE MARÇO, 12'},
+  {correct: false, adress: 'RUA NEVES HORIZONTE, 45'},
+  {correct: false, adress: 'RUA CAMERINDO NEVES, 138'},
+  {correct: false, adress: 'TRAV. RUI BARBOSA, S/N'},
+  {correct: false, adress: 'ESTRADA P/ PAJEÚ, S/N'},
+  {correct: false, adress: 'AV. MANOEL BARBOSA, 875'},
+  {correct: false, adress: 'PRAÇA DOS BANDEIRANTES, 78'},
+  {correct: false, adress: 'RUA RUBEM ALVES, 44'},
+  {correct: false, adress: 'BR 030 KM5 N°412'},
+  {correct: false, adress: 'AV. DURVAL GUIMARÃES COSTA, 54'},
 ]
 
 function geraStringAleatoria(tamanho) {
@@ -868,25 +869,38 @@ MICKS TELECOM`;
 	}
 
   async atendimento(req, res){
-    console.log(req.body)
     let isSucess = false
 		let retorno = {}
     let descricao = `MicksApp - Contato: ${req.body.cel} - Problema: ${req.body.obs.replace(/'|"|\n|\r|\r\n/g, "")}`
+    const sql = `SELECT codsercli, codcli FROM servicos_cli WHERE codsercli = '${req.body.codsercli}';`
     let codOcorrencia = ''
     let codUsu_d = ''
-    /*
-    E9 Lucas Vieira Costa
-    G3 ILCIARA MESQUITA NASCIMENTO
-    
-    */
+    let codcli = ''
+    let codUsu = 'D8' // Cód do usuario micksApp
+
          if(req.body.motivo === "Sem internet")  {codOcorrencia = 'E9YA0NDABX', codUsu_d = 'E9'}
     else if(req.body.motivo === "Internet lenta"){codOcorrencia = 'E9YA0NCGK8', codUsu_d = 'E9'}
     else if(req.body.motivo === "Financeiro")    {codOcorrencia = 'E9Y80KGGLR', codUsu_d = 'E9'}
     else if(req.body.motivo === "Outros")        {codOcorrencia = 'E9Y40WWMKX', codUsu_d = 'E9'}
 
-    await ApiIntegrator_atendimento(req.body.codsercli, req.body.codcli, descricao, codOcorrencia, codUsu_d).then((resp)=>{
-        isSucess = true
-        retorno.msg = "Atendimento cadastrado com sucesso!"
+    
+    await INTE(sql).then((resp)=>{
+        //console.log(resp.resposta[0]) // EX: { codsercli: 'A76H0ZHX9Q', codcli: 14615 }
+        codcli = resp.resposta[0].codcli
+    }).catch((erro)=>{
+        console.log(erro)
+        codcli = req.body.codcli
+    });
+
+    await ApiIntegrator_atendimento(req.body.codsercli, codcli, descricao, codOcorrencia, codUsu_d, codUsu).then((resp)=>{
+        //console.log(resp) // EX: { error: false, exception: null, data: { results: [ [Object] ] } }
+        if(resp.error == true){
+            retorno.msg = resp.exception
+        }else{
+            //console.log(resp.data.results) // EX: [ { codoco: 'D8WDDJALI1', numero_oco: '426000', redmine: '' } ]
+            retorno.msg = "Atendimento cadastrado com sucesso!"
+        }
+        isSucess = true 
         retorno.dados = resp
     })
     .catch((erro)=>{
@@ -898,6 +912,62 @@ MICKS TELECOM`;
 
     API(retorno, res, 200, isSucess);
   }
+
+	async envio_massivo(req, res){
+		let isSucess = false;
+		let retorno = {};
+		let tokens = []
+		let tokens_envio = []
+		let numTokenMax = 100
+		let log = []
+
+		const sql2 = `SELECT token FROM users;`;
+		await appBD(sql2).then((resp)=>{
+			retorno.dados = resp.errorBD;
+			retorno.msg = `${resp.resposta.length} clientes encontrados`;
+			retorno.qtdClientes = resp.resposta.length 
+			retorno.texto = req.body.texto
+			retorno.titulo = req.body.titulo
+			isSucess = true;
+			tokens = resp.resposta
+		}).catch((erro)=>{
+			retorno.dados = erro;
+			retorno.msg = "Erro ao buscar token dos clientes";
+			retorno.texto = req.body.texto
+			retorno.titulo = req.body.titulo
+			isSucess = false;
+		});
+
+		for (const [index, item] of tokens.entries()) {
+			tokens_envio.push(item.token)
+
+			if(tokens_envio.length === numTokenMax){
+				await notify(tokens_envio, req.body.titulo, req.body.texto)
+				.then((resp)=>{
+					log.push(resp)
+				})
+				.catch((erro)=>{
+					log.push(erro)
+				})
+				tokens_envio = []
+			}
+
+		}
+
+		if(tokens_envio.length > 0){ // Envia pro resto que não completou dentro do FOR
+			await notify(tokens_envio, req.body.titulo, req.body.texto)
+			.then((resp)=>{
+				log.push(resp)
+			})
+			.catch((erro)=>{
+				log.push(erro)
+			})
+			tokens_envio = []
+		}
+
+		retorno.log = log
+		API(retorno, res, 200, isSucess);
+	}
 
 }
 module.exports = new buscarCliente();
